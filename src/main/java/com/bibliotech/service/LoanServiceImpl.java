@@ -14,15 +14,17 @@ public class LoanServiceImpl implements LoanService {
     private final LoanRepository loanRepository;
     private final LoanValidator loanValidator;
     private final LoanTrackerService loanTrackerService;
+    private final SanctionService sanctionService;
 
     public LoanServiceImpl(ResourceService resourceService, MemberService memberService, 
                            LoanRepository loanRepository, LoanValidator loanValidator,
-                           LoanTrackerService loanTrackerService) {
+                           LoanTrackerService loanTrackerService, SanctionService sanctionService) {
         this.resourceService = resourceService;
         this.memberService = memberService;
         this.loanRepository = loanRepository;
         this.loanValidator = loanValidator;
         this.loanTrackerService = loanTrackerService;
+        this.sanctionService = sanctionService;
     }
 
     @Override
@@ -57,6 +59,10 @@ public class LoanServiceImpl implements LoanService {
             .orElseThrow(() -> new EntityNotFoundException("No active loan found for resource: " + isbn));
 
         long delay = loanTrackerService.getDelay(activeLoan);
+
+        if (delay > 0) {
+            sanctionService.applySanction(activeLoan.memberDni(), delay);
+        }
 
         Loan updatedLoan = new Loan(
             activeLoan.id(),

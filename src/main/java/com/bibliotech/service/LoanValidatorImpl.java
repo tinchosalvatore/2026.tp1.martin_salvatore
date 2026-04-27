@@ -8,11 +8,18 @@ import java.time.LocalDate;
 import java.util.List;
 
 public class LoanValidatorImpl implements LoanValidator {
+    private final SanctionService sanctionService;
+
+    public LoanValidatorImpl(SanctionService sanctionService) {
+        this.sanctionService = sanctionService;
+    }
+
     @Override
     public void validateNewLoan(String isbn, Member member, List<Loan> activeLoans, LoanRepository repository) throws LibraryException {
         checkBookAvailability(isbn, repository);
         checkMemberQuota(member, activeLoans);
         checkOverdueLoans(activeLoans);
+        checkSanctions(member);
     }
 
     private void checkBookAvailability(String isbn, LoanRepository repository) throws ResourceNotAvailableException {
@@ -34,6 +41,12 @@ public class LoanValidatorImpl implements LoanValidator {
         
         if (hasOverdue) {
             throw new ValidationException("Member has overdue loans and cannot take new resources.");
+        }
+    }
+
+    private void checkSanctions(Member member) throws ValidationException {
+        if (sanctionService.isSanctioned(member.dni())) {
+            throw new ValidationException("Member is currently sanctioned and cannot take new resources.");
         }
     }
 }
