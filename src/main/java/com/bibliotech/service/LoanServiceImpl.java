@@ -75,4 +75,9 @@ public class LoanServiceImpl implements LoanService {
     public List<Loan> getHistory() {
         return loanRepository.findAll();
     }
+
+    @Override
+    public List<Loan> searchHistory(LoanSearchCriteria criteria) {
+        return loanRepository.search(criteria);
+    }
 }
