@@ -32,6 +32,9 @@ replay_pid*
 /build/
 /target/
 
+# Persistence
+src/main/java/com/bibliotech/db/database.json
+
 # Logs y Temporales
 *.class
 *.DS_Store
