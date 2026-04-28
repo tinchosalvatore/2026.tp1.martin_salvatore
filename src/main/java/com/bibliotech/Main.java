@@ -2,6 +2,7 @@ package com.bibliotech;
 
 import com.bibliotech.db.JsonDatabase;
 import com.bibliotech.exception.LibraryException;
+import com.bibliotech.exception.ValidationException;
 import com.bibliotech.model.*;
 import com.bibliotech.repository.*;
 import com.bibliotech.service.*;
@@ -14,9 +15,11 @@ import java.util.Scanner;
 
 public class Main {
     private static final Scanner scanner = new Scanner(System.in);
+    private static JsonDatabase db;
     private static ResourceService resourceService;
     private static MemberService memberService;
     private static LoanService loanService;
+    private static LoanRepository loanRepo;
 
     public static void main(String[] args) {
         init();
@@ -46,22 +49,11 @@ public class Main {
         try {
             List<String> logoLines = Files.readAllLines(Path.of("logo.txt"));
             List<String> nameLines = Files.readAllLines(Path.of("name.txt"));
-
-            int nameOffset = 3;
-            String spacing = "%-90s";
-
-            int maxLines = Math.max(logoLines.size(), nameLines.size() + nameOffset);
-
+            int maxLines = Math.max(logoLines.size(), nameLines.size());
             for (int i = 0; i < maxLines; i++) {
-                String name = "";
-
-                if (i >= nameOffset && (i - nameOffset) < nameLines.size()) {
-                    name = nameLines.get(i - nameOffset);
-                }
-
                 String logo = i < logoLines.size() ? logoLines.get(i) : "";
-
-                System.out.printf(spacing + " %s%n", name, logo);
+                String name = i < nameLines.size() ? nameLines.get(i) : "";
+                System.out.printf("%-40s %s%n", logo, name);
             }
         } catch (IOException e) {
             System.out.println("=== BiblioTech System ===");
@@ -69,14 +61,14 @@ public class Main {
     }
 
     private static void init() {
-        JsonDatabase db = new JsonDatabase();
+        db = new JsonDatabase();
         
         ResourceRepository resourceRepo = new JsonResourceRepository(db);
         MemberRepository memberRepo = new JsonMemberRepository(db);
-        LoanRepository loanRepo = new JsonLoanRepository(db);
+        loanRepo = new JsonLoanRepository(db);
         SanctionRepository sanctionRepo = new JsonSanctionRepository(db);
 
-        resourceService = new ResourceServiceImpl(resourceRepo);
+        resourceService = new ResourceServiceImpl(resourceRepo, new ResourceValidatorImpl());
         
         MemberValidator memberValidator = new MemberValidatorImpl();
         memberService = new MemberServiceImpl(memberRepo, memberValidator);
@@ -96,6 +88,7 @@ public class Main {
             System.out.println("3. Process Return");
             System.out.println("4. Search Resources");
             System.out.println("5. Loan History");
+            System.out.println("6. Run Sanction Demo (Hardcoded)");
             System.out.println("0. Back");
             System.out.print("> ");
 
@@ -107,6 +100,7 @@ public class Main {
                     case "3" -> processReturn();
                     case "4" -> searchResources();
                     case "5" -> showHistory();
+                    case "6" -> runSanctionDemo();
                     case "0" -> { return; }
                     default -> System.out.println("Invalid option.");
                 }
@@ -148,13 +142,17 @@ public class Main {
     private static void registerResource() throws Exception {
         System.out.println("Type: 1. Physical Book, 2. E-Book");
         String type = scanner.nextLine();
+        if (!type.equals("1") && !type.equals("2")) {
+            throw new ValidationException("Invalid resource type. Choose 1 or 2.");
+        }
         
         System.out.print("ISBN: "); String isbn = scanner.nextLine();
         System.out.print("Title: "); String title = scanner.nextLine();
         System.out.print("Author: "); String author = scanner.nextLine();
-        System.out.print("Year: "); int year = Integer.parseInt(scanner.nextLine());
+        System.out.print("Year: "); int year = readInt();
+        
         System.out.println("Category: 1. FICTION, 2. NON_FICTION, 3. SCIENCE, 4. TECHNOLOGY, 5. HISTORY, 6. ART");
-        Category cat = Category.values()[Integer.parseInt(scanner.nextLine()) - 1];
+        Category cat = readCategory();
 
         Resource resource;
         if (type.equals("1")) {
@@ -162,7 +160,7 @@ public class Main {
             resource = new PhysicalBook(isbn, title, author, year, cat, loc);
         } else {
             System.out.print("Format: "); String fmt = scanner.nextLine();
-            System.out.print("Size (MB): "); double size = Double.parseDouble(scanner.nextLine());
+            System.out.print("Size (MB): "); double size = readDouble();
             resource = new EBook(isbn, title, author, year, cat, fmt, size);
         }
         resourceService.registerResource(resource);
@@ -172,6 +170,10 @@ public class Main {
     private static void registerMember() throws Exception {
         System.out.println("Type: 1. Student, 2. Teacher");
         String type = scanner.nextLine();
+        if (!type.equals("1") && !type.equals("2")) {
+            throw new ValidationException("Invalid member type. Choose 1 or 2.");
+        }
+        
         System.out.print("DNI: "); String dni = scanner.nextLine();
         System.out.print("Name: "); String name = scanner.nextLine();
         System.out.print("Email: "); String email = scanner.nextLine();
@@ -224,5 +226,55 @@ public class Main {
         } else {
             history.forEach(l -> System.out.println("DNI: " + l.memberDni() + " | ISBN: " + l.isbn() + " | Due: " + l.dueDate() + " | Returned: " + l.returnDate().orElse(null)));
         }
+    }
+
+    private static void runSanctionDemo() throws Exception {
+        System.out.println("Setting up Sanction Demo...");
+        String lateDni = "12345";
+        String lateIsbn = "DEMO-BOOK";
+
+        if (memberService.findByDni(lateDni).isEmpty()) {
+            memberService.registerMember(new Student(lateDni, "Demo Late User", "late@demo.com"));
+        }
+        if (resourceService.findByIsbn(lateIsbn).isEmpty()) {
+            resourceService.registerResource(new PhysicalBook(lateIsbn, "Late Return Demo Book", "System", 2024, Category.TECHNOLOGY, "DEMO-SHELF"));
+        }
+
+        java.time.LocalDate dueDate = java.time.LocalDate.now().minusDays(5);
+        Loan lateLoan = new Loan(java.util.UUID.randomUUID(), lateIsbn, lateDni, dueDate.minusDays(7), dueDate, java.util.Optional.empty());
+        loanRepo.save(lateLoan);
+        
+        System.out.println("Demo setup complete!");
+        System.out.println("Member DNI: " + lateDni + " | Resource ISBN: " + lateIsbn);
+        System.out.println("1. Return the book as Librarian (Option 3).");
+        System.out.println("2. Then log in as Member " + lateDni + " and try to borrow any book.");
+    }
+
+    private static int readInt() {
+        while (true) {
+            try {
+                return Integer.parseInt(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                System.out.print("Invalid number. Try again: ");
+            }
+        }
+    }
+
+    private static double readDouble() {
+        while (true) {
+            try {
+                return Double.parseDouble(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                System.out.print("Invalid decimal number. Try again: ");
+            }
+        }
+    }
+
+    private static Category readCategory() throws ValidationException {
+        int catIdx = readInt() - 1;
+        if (catIdx < 0 || catIdx >= Category.values().length) {
+            throw new ValidationException("Invalid category selected.");
+        }
+        return Category.values()[catIdx];
     }
 }
