@@ -18,7 +18,7 @@ public class MemberValidatorImpl implements MemberValidator {
     }
 
     private void validateDniFormat(String dni) throws ValidationException {
-        if (dni == null || !DNI_PATTERN.matcher(dni).matches()) {
+        if (!DNI_PATTERN.matcher(dni).matches()) {
             throw new ValidationException("DNI must contain only digits.");
         }
     }

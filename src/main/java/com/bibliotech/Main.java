@@ -150,9 +150,12 @@ public class Main {
         System.out.print("Title: "); String title = scanner.nextLine();
         System.out.print("Author: "); String author = scanner.nextLine();
         System.out.print("Year: "); int year = readInt();
-        
         System.out.println("Category: 1. FICTION, 2. NON_FICTION, 3. SCIENCE, 4. TECHNOLOGY, 5. HISTORY, 6. ART");
-        Category cat = readCategory();
+        int catIdx = readInt() - 1;
+        if (catIdx < 0 || catIdx >= Category.values().length) {
+            throw new com.bibliotech.exception.ValidationException("Invalid category selected.");
+        }
+        Category cat = Category.values()[catIdx];
 
         Resource resource;
         if (type.equals("1")) {
@@ -165,6 +168,26 @@ public class Main {
         }
         resourceService.registerResource(resource);
         System.out.println("Resource registered!");
+    }
+
+    private static int readInt() {
+        while (true) {
+            try {
+                return Integer.parseInt(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                System.out.print("Invalid number. Try again: ");
+            }
+        }
+    }
+
+    private static double readDouble() {
+        while (true) {
+            try {
+                return Double.parseDouble(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                System.out.print("Invalid decimal number. Try again: ");
+            }
+        }
     }
 
     private static void registerMember() throws Exception {
@@ -230,51 +253,36 @@ public class Main {
 
     private static void runSanctionDemo() throws Exception {
         System.out.println("Setting up Sanction Demo...");
+        
         String lateDni = "12345";
         String lateIsbn = "DEMO-BOOK";
 
+        // 1. Ensure Member exists
         if (memberService.findByDni(lateDni).isEmpty()) {
             memberService.registerMember(new Student(lateDni, "Demo Late User", "late@demo.com"));
         }
+
+        // 2. Ensure Resource exists
         if (resourceService.findByIsbn(lateIsbn).isEmpty()) {
             resourceService.registerResource(new PhysicalBook(lateIsbn, "Late Return Demo Book", "System", 2024, Category.TECHNOLOGY, "DEMO-SHELF"));
         }
 
+        // 3. Force a LATE loan using the SHARED repo
         java.time.LocalDate dueDate = java.time.LocalDate.now().minusDays(5);
-        Loan lateLoan = new Loan(java.util.UUID.randomUUID(), lateIsbn, lateDni, dueDate.minusDays(7), dueDate, java.util.Optional.empty());
+        Loan lateLoan = new Loan(
+            java.util.UUID.randomUUID(),
+            lateIsbn,
+            lateDni,
+            dueDate.minusDays(7),
+            dueDate,
+            java.util.Optional.empty()
+        );
+        
         loanRepo.save(lateLoan);
         
         System.out.println("Demo setup complete!");
         System.out.println("Member DNI: " + lateDni + " | Resource ISBN: " + lateIsbn);
         System.out.println("1. Return the book as Librarian (Option 3).");
         System.out.println("2. Then log in as Member " + lateDni + " and try to borrow any book.");
-    }
-
-    private static int readInt() {
-        while (true) {
-            try {
-                return Integer.parseInt(scanner.nextLine());
-            } catch (NumberFormatException e) {
-                System.out.print("Invalid number. Try again: ");
-            }
-        }
-    }
-
-    private static double readDouble() {
-        while (true) {
-            try {
-                return Double.parseDouble(scanner.nextLine());
-            } catch (NumberFormatException e) {
-                System.out.print("Invalid decimal number. Try again: ");
-            }
-        }
-    }
-
-    private static Category readCategory() throws ValidationException {
-        int catIdx = readInt() - 1;
-        if (catIdx < 0 || catIdx >= Category.values().length) {
-            throw new ValidationException("Invalid category selected.");
-        }
-        return Category.values()[catIdx];
     }
 }
