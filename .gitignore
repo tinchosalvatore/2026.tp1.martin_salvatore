@@ -35,3 +35,6 @@ replay_pid*
 # Logs y Temporales
 *.class
 *.DS_Store
+
+# db persistance (not necesary to upload to github)
+src/main/java/com/bibliotech/db/database.json
