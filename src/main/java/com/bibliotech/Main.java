@@ -14,9 +14,11 @@ import java.util.Scanner;
 
 public class Main {
     private static final Scanner scanner = new Scanner(System.in);
+    private static JsonDatabase db;
     private static ResourceService resourceService;
     private static MemberService memberService;
     private static LoanService loanService;
+    private static LoanRepository loanRepo;
 
     public static void main(String[] args) {
         init();
@@ -69,14 +71,14 @@ public class Main {
     }
 
     private static void init() {
-        JsonDatabase db = new JsonDatabase();
+        db = new JsonDatabase();
         
         ResourceRepository resourceRepo = new JsonResourceRepository(db);
         MemberRepository memberRepo = new JsonMemberRepository(db);
-        LoanRepository loanRepo = new JsonLoanRepository(db);
+        loanRepo = new JsonLoanRepository(db);
         SanctionRepository sanctionRepo = new JsonSanctionRepository(db);
 
-        resourceService = new ResourceServiceImpl(resourceRepo);
+        resourceService = new ResourceServiceImpl(resourceRepo, new ResourceValidatorImpl());
         
         MemberValidator memberValidator = new MemberValidatorImpl();
         memberService = new MemberServiceImpl(memberRepo, memberValidator);
@@ -96,6 +98,7 @@ public class Main {
             System.out.println("3. Process Return");
             System.out.println("4. Search Resources");
             System.out.println("5. Loan History");
+            System.out.println("6. Run Sanction Demo (Hardcoded)");
             System.out.println("0. Back");
             System.out.print("> ");
 
@@ -107,6 +110,7 @@ public class Main {
                     case "3" -> processReturn();
                     case "4" -> searchResources();
                     case "5" -> showHistory();
+                    case "6" -> runSanctionDemo();
                     case "0" -> { return; }
                     default -> System.out.println("Invalid option.");
                 }
@@ -152,9 +156,13 @@ public class Main {
         System.out.print("ISBN: "); String isbn = scanner.nextLine();
         System.out.print("Title: "); String title = scanner.nextLine();
         System.out.print("Author: "); String author = scanner.nextLine();
-        System.out.print("Year: "); int year = Integer.parseInt(scanner.nextLine());
+        System.out.print("Year: "); int year = readInt();
         System.out.println("Category: 1. FICTION, 2. NON_FICTION, 3. SCIENCE, 4. TECHNOLOGY, 5. HISTORY, 6. ART");
-        Category cat = Category.values()[Integer.parseInt(scanner.nextLine()) - 1];
+        int catIdx = readInt() - 1;
+        if (catIdx < 0 || catIdx >= Category.values().length) {
+            throw new com.bibliotech.exception.ValidationException("Invalid category selected.");
+        }
+        Category cat = Category.values()[catIdx];
 
         Resource resource;
         if (type.equals("1")) {
@@ -162,11 +170,31 @@ public class Main {
             resource = new PhysicalBook(isbn, title, author, year, cat, loc);
         } else {
             System.out.print("Format: "); String fmt = scanner.nextLine();
-            System.out.print("Size (MB): "); double size = Double.parseDouble(scanner.nextLine());
+            System.out.print("Size (MB): "); double size = readDouble();
             resource = new EBook(isbn, title, author, year, cat, fmt, size);
         }
         resourceService.registerResource(resource);
         System.out.println("Resource registered!");
+    }
+
+    private static int readInt() {
+        while (true) {
+            try {
+                return Integer.parseInt(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                System.out.print("Invalid number. Try again: ");
+            }
+        }
+    }
+
+    private static double readDouble() {
+        while (true) {
+            try {
+                return Double.parseDouble(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                System.out.print("Invalid decimal number. Try again: ");
+            }
+        }
     }
 
     private static void registerMember() throws Exception {
@@ -224,5 +252,40 @@ public class Main {
         } else {
             history.forEach(l -> System.out.println("DNI: " + l.memberDni() + " | ISBN: " + l.isbn() + " | Due: " + l.dueDate() + " | Returned: " + l.returnDate().orElse(null)));
         }
+    }
+
+    private static void runSanctionDemo() throws Exception {
+        System.out.println("Setting up Sanction Demo...");
+        
+        String lateDni = "12345";
+        String lateIsbn = "DEMO-BOOK";
+
+        // 1. Ensure Member exists
+        if (memberService.findByDni(lateDni).isEmpty()) {
+            memberService.registerMember(new Student(lateDni, "Demo Late User", "late@demo.com"));
+        }
+
+        // 2. Ensure Resource exists
+        if (resourceService.findByIsbn(lateIsbn).isEmpty()) {
+            resourceService.registerResource(new PhysicalBook(lateIsbn, "Late Return Demo Book", "System", 2024, Category.TECHNOLOGY, "DEMO-SHELF"));
+        }
+
+        // 3. Force a LATE loan using the SHARED repo
+        java.time.LocalDate dueDate = java.time.LocalDate.now().minusDays(5);
+        Loan lateLoan = new Loan(
+            java.util.UUID.randomUUID(),
+            lateIsbn,
+            lateDni,
+            dueDate.minusDays(7),
+            dueDate,
+            java.util.Optional.empty()
+        );
+        
+        loanRepo.save(lateLoan);
+        
+        System.out.println("Demo setup complete!");
+        System.out.println("Member DNI: " + lateDni + " | Resource ISBN: " + lateIsbn);
+        System.out.println("1. Return the book as Librarian (Option 3).");
+        System.out.println("2. Then log in as Member " + lateDni + " and try to borrow any book.");
     }
 }

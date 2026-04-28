@@ -9,16 +9,16 @@ import java.util.Optional;
 
 public class ResourceServiceImpl implements ResourceService {
     private final ResourceRepository resourceRepository;
+    private final ResourceValidator resourceValidator;
 
-    public ResourceServiceImpl(ResourceRepository resourceRepository) {
+    public ResourceServiceImpl(ResourceRepository resourceRepository, ResourceValidator resourceValidator) {
         this.resourceRepository = resourceRepository;
+        this.resourceValidator = resourceValidator;
     }
 
     @Override
     public void registerResource(Resource resource) throws ValidationException {
-        if (resourceRepository.findById(resource.isbn()).isPresent()) {
-            throw new ValidationException("Resource with ISBN " + resource.isbn() + " already exists.");
-        }
+        resourceValidator.validate(resource, resourceRepository);
         resourceRepository.save(resource);
     }
 
