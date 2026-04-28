@@ -2,6 +2,7 @@ package com.bibliotech;
 
 import com.bibliotech.db.JsonDatabase;
 import com.bibliotech.exception.LibraryException;
+import com.bibliotech.exception.ValidationException;
 import com.bibliotech.model.*;
 import com.bibliotech.repository.*;
 import com.bibliotech.service.*;
@@ -48,22 +49,11 @@ public class Main {
         try {
             List<String> logoLines = Files.readAllLines(Path.of("logo.txt"));
             List<String> nameLines = Files.readAllLines(Path.of("name.txt"));
-
-            int nameOffset = 3;
-            String spacing = "%-90s";
-
-            int maxLines = Math.max(logoLines.size(), nameLines.size() + nameOffset);
-
+            int maxLines = Math.max(logoLines.size(), nameLines.size());
             for (int i = 0; i < maxLines; i++) {
-                String name = "";
-
-                if (i >= nameOffset && (i - nameOffset) < nameLines.size()) {
-                    name = nameLines.get(i - nameOffset);
-                }
-
                 String logo = i < logoLines.size() ? logoLines.get(i) : "";
-
-                System.out.printf(spacing + " %s%n", name, logo);
+                String name = i < nameLines.size() ? nameLines.get(i) : "";
+                System.out.printf("%-40s %s%n", logo, name);
             }
         } catch (IOException e) {
             System.out.println("=== BiblioTech System ===");
@@ -152,6 +142,9 @@ public class Main {
     private static void registerResource() throws Exception {
         System.out.println("Type: 1. Physical Book, 2. E-Book");
         String type = scanner.nextLine();
+        if (!type.equals("1") && !type.equals("2")) {
+            throw new ValidationException("Invalid resource type. Choose 1 or 2.");
+        }
         
         System.out.print("ISBN: "); String isbn = scanner.nextLine();
         System.out.print("Title: "); String title = scanner.nextLine();
@@ -200,6 +193,10 @@ public class Main {
     private static void registerMember() throws Exception {
         System.out.println("Type: 1. Student, 2. Teacher");
         String type = scanner.nextLine();
+        if (!type.equals("1") && !type.equals("2")) {
+            throw new ValidationException("Invalid member type. Choose 1 or 2.");
+        }
+        
         System.out.print("DNI: "); String dni = scanner.nextLine();
         System.out.print("Name: "); String name = scanner.nextLine();
         System.out.print("Email: "); String email = scanner.nextLine();

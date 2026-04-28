@@ -30,7 +30,7 @@ public class MemberValidatorImpl implements MemberValidator {
     }
 
     private void validateEmail(String email) throws ValidationException {
-        if (!EMAIL_PATTERN.matcher(email).matches()) {
+        if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
             throw new ValidationException("Invalid email format: " + email);
         }
     }
